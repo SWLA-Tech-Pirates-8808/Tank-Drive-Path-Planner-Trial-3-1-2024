@@ -61,8 +61,6 @@ public final class Constants {
     public static final double WheelRadiousMeters  = Units.inchesToMeters(3.0);
     public static final double kWheelRadiusInches = 3.00;
     public static final double EncoderDistancePerPulse = (WheelDiameterMeters * Math.PI)/ GearRatio / (double) EncoderTPR;
-    public static final double LeftTravel = ((WheelDiameterMeters * Math.PI)/ GearRatio / (double) EncoderTPR) * leftEnc.getPosition().getValueAsDouble();
-    public static final double RightTravel = (WheelDiameterMeters * Math.PI)/ GearRatio / (double) EncoderTPR;
     public static final double WheelCircumferenceMeters = 2*Math.PI*WheelRadiousMeters;
     public static final double Conversion = WheelCircumferenceMeters/(GearRatio*EncoderTPR);
     public static final int k100msPerSecond = 10;

@@ -77,10 +77,10 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
 
   public Lets_freakin_DRIVEEEE() {
 
-    frontLeftLeader = new TalonFX(1);
-    backLeftFollower = new TalonFX(2);
-    frontRightLeader = new TalonFX(3);
-    backRightFollower = new TalonFX(4);
+    frontLeftLeader = new TalonFX(4);
+    backLeftFollower = new TalonFX(3);
+    frontRightLeader = new TalonFX(1);
+    backRightFollower = new TalonFX(2);
 
     backLeftFollower.setControl(new Follower(frontLeftLeader.getDeviceID(), false));
     backRightFollower.setControl(new Follower(frontRightLeader.getDeviceID(), false));
@@ -102,7 +102,7 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
     
 
     //odometry = new DifferentialDriveOdometry(gyro.getRotation2d(), leftE.getPosition(), rightE.getPosition());
-    //kinematics = new DifferentialDriveKinematics(0.5842);
+    kinematics = new DifferentialDriveKinematics(0.5842);
 
 
     UnderBoy = new DifferentialDrive(frontLeftLeader, frontRightLeader);
@@ -132,7 +132,12 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
 
   // func for drive train
    public void goOnAnGetBOY(double turnspeed, double moveSpeed){
-    UnderBoy.arcadeDrive(turnspeed, -moveSpeed);
+    UnderBoy.arcadeDrive(turnspeed, moveSpeed);
+   }
+
+   public void resetPose(Pose2d pose){
+  
+    odometry.resetPosition(gyro.getRotation2d(), leftEnc, rightEnc, pose);
    }
 
    public double avgEncDistance(){
@@ -191,11 +196,12 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
     return kinematics.toChassisSpeeds(getWheelSpeeds());
   }
 
-  public void drive(){
-    DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(ChassisSpeeds);
-    //wheelSpeeds.desaturate(0.5);
+   public void drive(ChassisSpeeds ChassisSpeeds){
 
-    UnderBoy.tankDrive(set.frontLeftLeader(leftWheelSpeed), rightController);
+    DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(ChassisSpeeds);
+    wheelSpeeds.desaturate(0.5);
+
+    UnderBoy.tankDrive( wheelSpeeds.leftMetersPerSecond, -wheelSpeeds.rightMetersPerSecond);
 
     SmartDashboard.putNumber("wheel sped left", wheelSpeeds.leftMetersPerSecond);
     SmartDashboard.putNumber("wheel sped right", wheelSpeeds.rightMetersPerSecond);
