@@ -4,13 +4,14 @@
 
 package frc.robot.subsystems;
 
-//import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.RamseteController;
-//import edu.wpi.first.math.geometry.Pose2d;
-//import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.DriverStation;
 //import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.RobotController;
@@ -19,15 +20,16 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import frc.robot.Constants;
-import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
+import edu.wpi.first.math.util.Units;
+import frc.robot.Constants.DriveConstants;
 
-//import com.pathplanner.lib.auto.AutoBuilder;
-//import com.pathplanner.lib.util.ReplanningConfig;
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.util.ReplanningConfig;
 import com.kauailabs.navx.frc.AHRS;
-//import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
-//import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
-//import edu.wpi.first.math.kinematics.ChassisSpeeds;
-//import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.StatusSignal;
@@ -42,8 +44,8 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
   DifferentialDrive UnderBoy;
   AHRS gyro;
   RamseteController controller1;
-  //DifferentialDriveOdometry odometry;
-  //DifferentialDriveKinematics kinematics;
+  DifferentialDriveOdometry odometry;
+  DifferentialDriveKinematics kinematics;
   double speeds;
   TalonFX frontLeftLeader;
   TalonFX frontRightLeader;
@@ -59,6 +61,9 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
   JoystickButton right;
   public double leftEnc;
   double rightEnc;
+  double error;
+  PIDController leftController;
+  PIDController rightController;
 
 
   
@@ -86,24 +91,29 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
 
     gyro = new AHRS(I2C.Port.kOnboard);
     controller1 = new RamseteController();
+    leftController = new PIDController(DriveConstants.Drive_Kp, 0, 0);
+    rightController = new PIDController(DriveConstants.Drive_Kp, 0, 0);
 
     leftEnc = frontLeftLeader.getPosition().getValueAsDouble() * Constants.OperatorConstants.kLinearDistanceConversionFactor;
     rightEnc = frontRightLeader.getPosition().getValueAsDouble() * Constants.OperatorConstants.kLinearDistanceConversionFactor;
+
+    odometry = new DifferentialDriveOdometry(gyro.getRotation2d(), error, error);
     
+    
+
     //odometry = new DifferentialDriveOdometry(gyro.getRotation2d(), leftE.getPosition(), rightE.getPosition());
     //kinematics = new DifferentialDriveKinematics(0.5842);
 
 
     UnderBoy = new DifferentialDrive(frontLeftLeader, frontRightLeader);
 
-    // Configure AutoBuilder last
-    /* 
-         AutoBuilder.configureRamsete(
-                this :: getPose, // Robot pose supplier
-                this :: resetPose, // Method to reset odometry (will be called if your auto has a starting pose)
-                this :: getCurrentSpeeds, // Current ChassisSpeeds supplier
-                this :: drive, // Method that will drive the robot given ChassisSpeeds
-                new ReplanningConfig(false,false), // Default path replanning config. See the API for the options here
+    AutoBuilder.configureRamsete(
+                
+                this::getPose,
+                this::resetPose, // Robot pose supplier
+                this::getChassisSpeeds, // Current ChassisSpeeds supplier
+                this::drive, // Method that will drive the robot given ChassisSpeeds
+                new ReplanningConfig(), // Default path replanning config. See the API for the options here
                 () -> {
                     // Boolean supplier that controls when the path will be mirrored for the red alliance
                     // This will flip the path being followed to the red side of the field.
@@ -111,12 +121,12 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
 
                     var alliance = DriverStation.getAlliance();
                     if (alliance.isPresent()) {
-                        return alliance.get() == DriverStation.Alliance.Blue;
+                        return alliance.get() == DriverStation.Alliance.Red;
                     }
                     return false;
                 },
                 this // Reference to this subsystem to set requirements
-        ); */
+        );
     
   } 
 
@@ -141,6 +151,64 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
    }
 
    // start stuff for path planner
+   private double driveTrainP() {
+    double error = frontLeftLeader.getPosition().getValueAsDouble() - frontRightLeader.getPosition().getValueAsDouble();
+    return DriveConstants.DRIVE_P * error;
+   }
+
+   private int distanceToNativeUnits(double positionMeters) {
+    double wheelRotations = positionMeters / (2 * Math.PI * Units.inchesToMeters(DriveConstants.kWheelRadiusInches));
+    double motorRotations = wheelRotations * DriveConstants.GearRatio;
+    int sensorCounts = (int)(motorRotations * DriveConstants.EncoderTPR);
+    return sensorCounts;
+   }
+
+   private int velocityToNativeUnits(double velocityMetersPerSecond) {
+    double wheelRotationsPerSecond = velocityMetersPerSecond/(2 * Math.PI * Units.inchesToMeters(DriveConstants.kWheelRadiusInches));
+    double motorRotationsPer100ms = wheelRotationsPerSecond * DriveConstants.k100msPerSecond;
+    int sensorCountsPer100ms = (int)(motorRotationsPer100ms * DriveConstants.EncoderTPR);
+    return sensorCountsPer100ms;
+  }
+
+  private double nativeUnitsToDistanceMeters(double sensorCounts) {
+    double motorRotations = (double)sensorCounts / DriveConstants.EncoderTPR;
+    double wheelRotations = motorRotations / DriveConstants.GearRatio;
+    double positionMeters = wheelRotations * (2 * Math.PI * Units.inchesToMeters(DriveConstants.kWheelRadiusInches));
+    return positionMeters;
+  }
+
+  public Pose2d getPose() {
+    return odometry.getPoseMeters();
+  }
+
+  public DifferentialDriveWheelSpeeds getWheelSpeeds() {
+    double leftWheelSpeed = 10 * nativeUnitsToDistanceMeters(frontLeftLeader.getVelocity().getValueAsDouble());
+    double rightWheelSpeed = 10 * nativeUnitsToDistanceMeters(frontRightLeader.getVelocity().getValueAsDouble());
+    return new DifferentialDriveWheelSpeeds(leftWheelSpeed, rightWheelSpeed);
+  }
+
+  public ChassisSpeeds getChassisSpeeds() {
+    return kinematics.toChassisSpeeds(getWheelSpeeds());
+  }
+
+  public void drive(){
+    DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(ChassisSpeeds);
+    //wheelSpeeds.desaturate(0.5);
+
+    UnderBoy.tankDrive(set.frontLeftLeader(leftWheelSpeed), rightController);
+
+    SmartDashboard.putNumber("wheel sped left", wheelSpeeds.leftMetersPerSecond);
+    SmartDashboard.putNumber("wheel sped right", wheelSpeeds.rightMetersPerSecond);
+
+   }
+
+
+  //public void resetOdometry(Pose2d pose) {
+    //resetEnc();
+    //odometry.resetPosition(gyro.getRotation2d(), DifferentialDrive.wheel, pose);;
+  //}
+
+
    /*public void resetPose(Pose2d pose){
   
     odometry.resetPosition(gyro.getRotation2d(), leftE.getPosition(), rightE.getPosition(), pose);
@@ -183,8 +251,10 @@ public class Lets_freakin_DRIVEEEE extends SubsystemBase {
     double x = tx.getDouble(0.0);
     double y = ty.getDouble(0.0);
     double area = ta.getDouble(0.0);
-    //odometry.update(gyro.getRotation2d(), readPosition(leftE, 6), readPosition(rightE, 6));
-
+    odometry.update(gyro.getRotation2d(), 
+                    nativeUnitsToDistanceMeters(frontLeftLeader.getPosition().getValueAsDouble()), 
+                    nativeUnitsToDistanceMeters(frontRightLeader.getPosition().getValueAsDouble()));
+    
     a = new JoystickButton(Driver, XboxController.Button.kA.value);
     ky = new JoystickButton(Driver, XboxController.Button.kY.value);
     kx = new JoystickButton(Driver, XboxController.Button.kX.value);

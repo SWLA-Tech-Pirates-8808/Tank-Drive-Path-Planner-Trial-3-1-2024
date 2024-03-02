@@ -12,9 +12,13 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 /* You will need to import all commands and subsystems here. Use the below method to import all with only 2 lines of code */
 import frc.robot.commands.*;
 import frc.robot.subsystems.*;
+
+import com.pathplanner.lib.auto.AutoBuilder;
+
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.XboxController;
-//import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 //import com.pathplanner.lib.commands.PathPlannerAuto;
 //import com.pathplanner.lib.path.PathPlannerPath;
@@ -50,6 +54,7 @@ public class RobotContainer {
   private final JoystickButton SpeakAim = new JoystickButton(bazinga, XboxController.Button.kX.value);
   private final JoystickButton AutoTest = new JoystickButton(bazinga, XboxController.Button.kY.value);
 
+  private final SendableChooser<Command> autoChooser;  
   // Replace with CommandPS4Controller or CommandJoystick if needed
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
@@ -63,6 +68,9 @@ public class RobotContainer {
     configureBindings();
 
     //PathPlannerPath path = PathPlannerPath.fromPathFile("Straight");
+
+    autoChooser = AutoBuilder.buildAutoChooser();
+    SmartDashboard.putData("Auto Chooser", autoChooser);
 
   }
 
@@ -104,6 +112,6 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
    // An example command will be run in autonomous
-    return new autDrive(s_Lets_freakin_DRIVEEEE);
+   return autoChooser.getSelected();
   }
 }
